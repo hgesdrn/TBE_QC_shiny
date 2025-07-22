@@ -5,16 +5,41 @@ library(dplyr)
 library(ggplot2)
 library(shinyWidgets)
 
-# Chargement du contour du Québec avec découpe du Saguenay
-qc_contour <- readRDS("data/prov_sf.rds")
+# URL GitHub brute
+base_url <- "https://raw.githubusercontent.com/hgesdrn/TBE_QC_shiny/main/data/"
 
-# Chargement des fichiers TBE annuels en une seule liste nommée
-tbe_list <- lapply(2007:2024, function(yr) {
-  df <- readRDS(file.path("data/periodes", paste0("TBE_", yr, ".rds")))
+# Contour simplifié du Québec
+qc_contour <- readRDS(url(paste0(base_url, "prov_sf.rds"))) %>%
+  st_simplify(dTolerance = 1000)
+
+# Liste des années disponibles
+annees <- 2007:2024
+
+# Chargement des fichiers TBE en une seule table
+tbe_list <- lapply(annees, function(yr) {
+  df <- readRDS(url(paste0(base_url, "periodes/TBE_", yr, ".rds")))
   df$AN_TBE <- yr
   df
 })
-names(tbe_list) <- as.character(2007:2024)
+names(tbe_list) <- as.character(annees)
+
+# Table complète (pour les graphiques)
+tbe_all <- do.call(rbind, tbe_list) %>%
+  mutate(RES_NM_REG = trimws(RES_NM_REG)) %>%
+  st_drop_geometry()
+
+# Préparation des données graphiques
+df_saguenay <- tbe_all %>%
+  filter(RES_NM_REG == "Saguenay–Lac-Saint-Jean") %>%
+  group_by(AN_TBE) %>%
+  summarise(SUP_HA = sum(SUP_HA)) %>%
+  mutate(SUP_MHA = SUP_HA / 1e6)
+
+df_quebec <- tbe_all %>%
+  filter(RES_NM_REG == "Saguenay–Lac-Saint-Jean" | is.na(RES_NM_REG)) %>%
+  group_by(AN_TBE) %>%
+  summarise(SUP_HA = sum(SUP_HA)) %>%
+  mutate(SUP_MHA = SUP_HA / 1e6)
 
 # UI
 ui <- fluidPage(
@@ -63,7 +88,7 @@ ui <- fluidPage(
                sliderTextInput(
                  inputId = "annee",
                  label = "Choisissez une année :",
-                 choices = as.character(2007:2024),
+                 choices = as.character(annees),
                  selected = "2007",
                  grid = TRUE,
                  width = "100%"
@@ -116,30 +141,20 @@ server <- function(input, output, session) {
         fillColor = "#085016",
         fillOpacity = 0.7,
         color = NA,
-        weight = 0#,
-        #label = ~paste("Superficie:", round(SUP_HA), "ha"),
-        #labelOptions = labelOptions(style = list("font-weight" = "bold"), textOnly = TRUE)
+        weight = 0
       )
   })
   
   output$plot_saguenay <- renderPlot({
-    df_all <- do.call(rbind, tbe_list) %>%
-      st_drop_geometry() %>%
-      mutate(RES_NM_REG = trimws(RES_NM_REG)) %>%
-      filter(RES_NM_REG == "Saguenay–Lac-Saint-Jean") %>%
-      group_by(AN_TBE) %>%
-      summarise(SUP_HA = sum(SUP_HA, na.rm = TRUE)) %>%
-      mutate(SUP_HA = SUP_HA / 1e6,
-             couleur = ifelse(AN_TBE == as.numeric(input$annee), "Sélectionnée", "Autre"))
+    df <- df_saguenay %>%
+      mutate(couleur = ifelse(AN_TBE == as.numeric(input$annee), "Sélectionnée", "Autre"))
     
-    ggplot(df_all, aes(x = factor(AN_TBE), y = SUP_HA, fill = couleur)) +
+    ggplot(df, aes(x = factor(AN_TBE), y = SUP_MHA, fill = couleur)) +
       geom_bar(stat = "identity") +
       geom_text(
-        data = subset(df_all, couleur == "Sélectionnée"),
-        aes(label = sprintf("%.1f", SUP_HA)),
-        vjust = -0.5,
-        color = "black",
-        size = 4
+        data = subset(df, couleur == "Sélectionnée"),
+        aes(label = sprintf("%.1f", SUP_MHA)),
+        vjust = -0.5, color = "black", size = 4
       ) +
       ylim(0, 15) +
       scale_fill_manual(values = c("Sélectionnée" = "gray50", "Autre" = "#4a5a76"), guide = "none") +
@@ -147,33 +162,22 @@ server <- function(input, output, session) {
       theme_minimal()
   })
   
-  
   output$plot_quebec <- renderPlot({
-    df_all <- do.call(rbind, tbe_list) %>%
-      st_drop_geometry()
+    df <- df_quebec %>%
+      mutate(couleur = ifelse(AN_TBE == as.numeric(input$annee), "Sélectionnée", "Autre"))
     
-    df_quebec <- df_all %>%
-      group_by(AN_TBE) %>%
-      summarise(SUP_HA = sum(SUP_HA, na.rm = TRUE)) %>%
-      mutate(SUP_HA = SUP_HA / 1e6,
-             couleur = ifelse(AN_TBE == as.numeric(input$annee), "Sélectionnée", "Autre"))
-    
-    ggplot(df_quebec, aes(x = factor(AN_TBE), y = SUP_HA, fill = couleur)) +
+    ggplot(df, aes(x = factor(AN_TBE), y = SUP_MHA, fill = couleur)) +
       geom_bar(stat = "identity") +
       geom_text(
-        data = subset(df_quebec, couleur == "Sélectionnée"),
-        aes(label = sprintf("%.1f", SUP_HA)),
-        vjust = -0.5,
-        color = "black",
-        size = 4
+        data = subset(df, couleur == "Sélectionnée"),
+        aes(label = sprintf("%.1f", SUP_MHA)),
+        vjust = -0.5, color = "black", size = 4
       ) +
       ylim(0, 15) +
       scale_fill_manual(values = c("Sélectionnée" = "gray50", "Autre" = "#085016"), guide = "none") +
       labs(title = "Province du Québec", x = NULL, y = "Superficie (millions ha)") +
       theme_minimal()
   })
-  
-  
 }
 
 shinyApp(ui, server)

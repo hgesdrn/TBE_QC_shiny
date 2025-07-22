@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+# ignorer les fichiers locaux générés par renv
+renv/library/
+renv/python/
+renv/staging/

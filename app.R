@@ -5,41 +5,14 @@ library(dplyr)
 library(ggplot2)
 library(shinyWidgets)
 
-# URL GitHub brute
-base_url <- "https://raw.githubusercontent.com/hgesdrn/TBE_QC_shiny/main/data/"
-
-# Contour simplifié du Québec
-qc_contour <- readRDS(url(paste0(base_url, "prov_sf.rds"))) %>%
-  st_simplify(dTolerance = 1000)
-
 # Liste des années disponibles
 annees <- 2007:2024
 
-# Chargement des fichiers TBE en une seule table
-tbe_list <- lapply(annees, function(yr) {
-  df <- readRDS(url(paste0(base_url, "periodes/TBE_", yr, ".rds")))
-  df$AN_TBE <- yr
-  df
-})
-names(tbe_list) <- as.character(annees)
+# URL base du dépôt GitHub brut (adapté à ton futur déploiement GitHub)
+base_url <- "https://raw.githubusercontent.com/hgesdrn/TBE_QC_shiny/main/data/"
 
-# Table complète (pour les graphiques)
-tbe_all <- do.call(rbind, tbe_list) %>%
-  mutate(RES_NM_REG = trimws(RES_NM_REG)) %>%
-  st_drop_geometry()
-
-# Préparation des données graphiques
-df_saguenay <- tbe_all %>%
-  filter(RES_NM_REG == "Saguenay–Lac-Saint-Jean") %>%
-  group_by(AN_TBE) %>%
-  summarise(SUP_HA = sum(SUP_HA)) %>%
-  mutate(SUP_MHA = SUP_HA / 1e6)
-
-df_quebec <- tbe_all %>%
-  filter(RES_NM_REG == "Saguenay–Lac-Saint-Jean" | is.na(RES_NM_REG)) %>%
-  group_by(AN_TBE) %>%
-  summarise(SUP_HA = sum(SUP_HA)) %>%
-  mutate(SUP_MHA = SUP_HA / 1e6)
+# Chargement du contour du Québec avec découpe du Saguenay
+qc_contour <- readRDS(url(paste0(base_url, "prov_sf.rds")))
 
 # UI
 ui <- fluidPage(
@@ -107,25 +80,28 @@ ui <- fluidPage(
 
 # Serveur
 server <- function(input, output, session) {
-
+  
+  # Conteneur pour les données TBE chargées
   rv <- reactiveValues(tbe_data = list())
   
-  # Chargement initial de tous les fichiers TBE dans reactiveValues
+  # Chargement des données TBE au démarrage
   observe({
     for (yr in annees) {
       isolate({
-        message(paste("Chargement TBE pour", yr))
-        rv$tbe_data[[as.character(yr)]] <- readRDS(url(paste0(base_url, "periodes/TBE_", yr, ".rds")))
+        fichier <- paste0(base_url, "periodes/TBE_", yr, ".rds")
+        message(paste("Chargement de :", fichier))
+        rv$tbe_data[[as.character(yr)]] <- readRDS(url(fichier))
       })
     }
   })
   
+  # Réactif : données pour l’année sélectionnée
   data_filtered <- reactive({
     req(input$annee)
     rv$tbe_data[[input$annee]]
   })
   
-  
+  # Carte initiale
   output$map <- renderLeaflet({
     bbox <- st_bbox(qc_contour)
     
@@ -143,9 +119,10 @@ server <- function(input, output, session) {
                 lng2 = bbox[["xmax"]], lat2 = bbox[["ymax"]])
   })
   
-  # Mise à jour des polygones TBE
+  # Mise à jour des polygones TBE pour l’année sélectionnée
   observeEvent(input$annee, {
     req(data_filtered())
+    
     leafletProxy("map") %>%
       clearGroup("TBE") %>%
       addPolygons(
@@ -158,34 +135,45 @@ server <- function(input, output, session) {
       )
   })
   
+  # Graphique Saguenay
   output$plot_saguenay <- renderPlot({
-    df <- df_saguenay %>%
-      mutate(couleur = ifelse(AN_TBE == as.numeric(input$annee), "Sélectionnée", "Autre"))
+    df_all <- lapply(rv$tbe_data, function(df) {
+      df <- st_drop_geometry(df)
+      df$RES_NM_REG <- trimws(df$RES_NM_REG)
+      df[df$RES_NM_REG == "Saguenay–Lac-Saint-Jean", ]
+    }) %>%
+      bind_rows() %>%
+      group_by(AN_TBE) %>%
+      summarise(SUP_HA = sum(SUP_HA, na.rm = TRUE)) %>%
+      mutate(SUP_HA = SUP_HA / 1e6,
+             couleur = ifelse(AN_TBE == as.numeric(input$annee), "Sélectionnée", "Autre"))
     
-    ggplot(df, aes(x = factor(AN_TBE), y = SUP_MHA, fill = couleur)) +
+    ggplot(df_all, aes(x = factor(AN_TBE), y = SUP_HA, fill = couleur)) +
       geom_bar(stat = "identity") +
-      geom_text(
-        data = subset(df, couleur == "Sélectionnée"),
-        aes(label = sprintf("%.1f", SUP_MHA)),
-        vjust = -0.5, color = "black", size = 4
-      ) +
+      geom_text(data = subset(df_all, couleur == "Sélectionnée"),
+                aes(label = sprintf("%.1f", SUP_HA)),
+                vjust = -0.5, color = "black", size = 4) +
       ylim(0, 15) +
       scale_fill_manual(values = c("Sélectionnée" = "gray50", "Autre" = "#4a5a76"), guide = "none") +
       labs(title = "Saguenay–Lac-Saint-Jean", x = NULL, y = "Superficie (millions ha)") +
       theme_minimal()
   })
   
+  # Graphique Québec
   output$plot_quebec <- renderPlot({
-    df <- df_quebec %>%
-      mutate(couleur = ifelse(AN_TBE == as.numeric(input$annee), "Sélectionnée", "Autre"))
+    df_all <- lapply(rv$tbe_data, function(df) st_drop_geometry(df)) %>% bind_rows()
     
-    ggplot(df, aes(x = factor(AN_TBE), y = SUP_MHA, fill = couleur)) +
+    df_quebec <- df_all %>%
+      group_by(AN_TBE) %>%
+      summarise(SUP_HA = sum(SUP_HA, na.rm = TRUE)) %>%
+      mutate(SUP_HA = SUP_HA / 1e6,
+             couleur = ifelse(AN_TBE == as.numeric(input$annee), "Sélectionnée", "Autre"))
+    
+    ggplot(df_quebec, aes(x = factor(AN_TBE), y = SUP_HA, fill = couleur)) +
       geom_bar(stat = "identity") +
-      geom_text(
-        data = subset(df, couleur == "Sélectionnée"),
-        aes(label = sprintf("%.1f", SUP_MHA)),
-        vjust = -0.5, color = "black", size = 4
-      ) +
+      geom_text(data = subset(df_quebec, couleur == "Sélectionnée"),
+                aes(label = sprintf("%.1f", SUP_HA)),
+                vjust = -0.5, color = "black", size = 4) +
       ylim(0, 15) +
       scale_fill_manual(values = c("Sélectionnée" = "gray50", "Autre" = "#085016"), guide = "none") +
       labs(title = "Province du Québec", x = NULL, y = "Superficie (millions ha)") +

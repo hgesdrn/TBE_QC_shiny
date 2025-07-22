@@ -1,4 +1,4 @@
-name: Deploy Shiny App
+name: Deploy TBE_QC_shiny
 
 on:
   push:
@@ -12,10 +12,10 @@ jobs:
       RENV_CONFIG_SANDBOX_ENABLED: FALSE
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup R
+      - name: Set up R
         uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies
@@ -25,7 +25,7 @@ jobs:
             pak
           needs: renv
 
-      - name: Restore R packages using renv.lock
+      - name: Install R packages from renv.lock
         run: |
           install.packages("pak")
           pak::pkglock_install("renv.lock")
@@ -37,6 +37,10 @@ jobs:
           SHINYAPPS_SECRET: ${{ secrets.SHINYAPPS_SECRET }}
         run: |
           install.packages("rsconnect")
-          rsconnect::setAccountInfo(name='hgesdrn', token=Sys.getenv("SHINYAPPS_TOKEN"), secret=Sys.getenv("SHINYAPPS_SECRET"))
+          rsconnect::setAccountInfo(
+            name = "hgesdrn",
+            token = Sys.getenv("SHINYAPPS_TOKEN"),
+            secret = Sys.getenv("SHINYAPPS_SECRET")
+          )
           rsconnect::deployApp(appDir = ".", appName = "TBE_QC_shiny", forceUpdate = TRUE)
         shell: Rscript {0}

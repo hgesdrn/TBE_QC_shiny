@@ -107,11 +107,24 @@ ui <- fluidPage(
 
 # Serveur
 server <- function(input, output, session) {
+
+  rv <- reactiveValues(tbe_data = list())
+  
+  # Chargement initial de tous les fichiers TBE dans reactiveValues
+  observe({
+    for (yr in annees) {
+      isolate({
+        message(paste("Chargement TBE pour", yr))
+        rv$tbe_data[[as.character(yr)]] <- readRDS(url(paste0(base_url, "periodes/TBE_", yr, ".rds")))
+      })
+    }
+  })
   
   data_filtered <- reactive({
     req(input$annee)
-    tbe_list[[as.character(input$annee)]]
+    rv$tbe_data[[input$annee]]
   })
+  
   
   output$map <- renderLeaflet({
     bbox <- st_bbox(qc_contour)
@@ -130,13 +143,13 @@ server <- function(input, output, session) {
                 lng2 = bbox[["xmax"]], lat2 = bbox[["ymax"]])
   })
   
-  observe({
-    tbe_sf <- data_filtered()
-    
+  # Mise à jour des polygones TBE
+  observeEvent(input$annee, {
+    req(data_filtered())
     leafletProxy("map") %>%
       clearGroup("TBE") %>%
       addPolygons(
-        data = tbe_sf,
+        data = data_filtered(),
         group = "TBE",
         fillColor = "#085016",
         fillOpacity = 0.7,

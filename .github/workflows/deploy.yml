@@ -22,8 +22,9 @@ jobs:
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: renv
+          needs: renv
 
-      - name: Restore R packages using renv
+      - name: Restore R packages from renv.lock
         run: |
           install.packages("renv")
           renv::restore()
@@ -35,6 +36,8 @@ jobs:
           SHINYAPPS_SECRET: ${{ secrets.SHINYAPPS_SECRET }}
         run: |
           install.packages("rsconnect")
-          rsconnect::setAccountInfo(name='hgesdrn', token=Sys.getenv("SHINYAPPS_TOKEN"), secret=Sys.getenv("SHINYAPPS_SECRET"))
+          rsconnect::setAccountInfo(name='hgesdrn',
+            token=Sys.getenv("SHINYAPPS_TOKEN"),
+            secret=Sys.getenv("SHINYAPPS_SECRET"))
           rsconnect::deployApp(appDir = ".", appName = "TBE_QC_shiny", forceUpdate = TRUE)
         shell: Rscript {0}

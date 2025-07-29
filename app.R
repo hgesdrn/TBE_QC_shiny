@@ -140,9 +140,11 @@ server <- function(input, output, session) {
     df_all <- lapply(rv$tbe_data, function(df) {
       df <- st_drop_geometry(df)
       df$RES_NM_REG <- trimws(df$RES_NM_REG)
-      df[df$RES_NM_REG == "Saguenay–Lac-Saint-Jean", ]
+      df <- df[df$RES_NM_REG == "Saguenay–Lac-Saint-Jean", ]
+      df
     }) %>%
       bind_rows() %>%
+      filter(!is.na(AN_TBE), AN_TBE %in% 2007:2024) %>%   # 🔍 Filtres importants
       group_by(AN_TBE) %>%
       summarise(SUP_HA = sum(SUP_HA, na.rm = TRUE)) %>%
       mutate(SUP_HA = SUP_HA / 1e6,
@@ -158,6 +160,7 @@ server <- function(input, output, session) {
       labs(title = "Saguenay–Lac-Saint-Jean", x = NULL, y = "Superficie (millions ha)") +
       theme_minimal()
   })
+  
   
   # Graphique Québec
   output$plot_quebec <- renderPlot({

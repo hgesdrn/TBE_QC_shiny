@@ -89,8 +89,10 @@ server <- function(input, output, session) {
         weight = 0,
         group = "Province"
       ) %>%
-      fitBounds(lng1 = bbox[["xmin"]], lat1 = bbox[["ymin"]],
-                lng2 = bbox[["xmax"]], lat2 = bbox[["ymax"]])
+      # fitBounds(lng1 = bbox[["xmin"]], lat1 = bbox[["ymin"]],
+      #           lng2 = bbox[["xmax"]], lat2 = bbox[["ymax"]])
+      fitBounds(lng1 = bbox[["xmin"]], lat1 = 45.0,
+                lng2 = bbox[["xmax"]], lat2 = 52.5)
   })
   
   # Mise à jour des polygones TBE

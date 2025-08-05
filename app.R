@@ -27,7 +27,59 @@ df_tbe_tabulaire <- charger_qs_github(paste0(base_url, "TBE_table_complete.qs"))
 # UI
 ui <- fluidPage(
   titlePanel(NULL),
-  tags$style(HTML("...")), # Tu peux laisser le CSS tel quel
+  tags$style(HTML("
+  /* --- Style général de l’en-tête --- */
+    .header-title {
+      background-color: #2C3E50;
+      color: white;
+      padding: 20px;
+      font-size: 22px;
+      font-weight: bold;
+      text-align: left;
+      text-transform: uppercase;
+      border-radius: 0px;
+      margin-bottom: 20px;
+      box-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+    }
+
+    /* --- Style des encadrés latéraux --- */
+    .box-style {
+      background-color: #f9f9f9;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+      height: 700px;
+      overflow-y: auto;
+    }
+
+    /* --- Style personnalisé du slider (contraste élevé) --- */
+    .irs--shiny .irs-line {
+      background-color: #ddd !important; /* ligne complète */
+      border-color: #ddd !important;
+    }
+    
+    .irs--shiny .irs-bar {
+      background-color: #ddd !important; /* portion entre min et curseur */
+      border-color: #ddd !important;
+    }
+    
+    .irs--shiny .irs-bar-edge {
+      background-color: #ddd !important;
+      border-color: #ddd !important;
+    }
+    
+    .irs--shiny .irs-single {
+      background-color: #ddd !important; /* valeur affichée */
+      border-color: #ddd !important;
+      color: black !important;
+    }
+    
+    .irs--shiny .irs-handle {
+      border-color: #999 !important; /* curseur */
+      background-color: #999 !important;
+    }
+                  ")), # Tu peux laisser le CSS tel quel
   div("Superficie annuelle affectée par la TBE de 2007 à 2024", class = "header-title"),
   fluidRow(
     column(6,

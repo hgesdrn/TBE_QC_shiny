@@ -179,11 +179,20 @@ server <- function(input, output, session) {
                 aes(label = sprintf("%.1f", SUP_HA)),
                 vjust = -0.5, color = "black", size = 4) +
       ylim(0, 15) +
-      scale_fill_manual(values = c("Sélectionnée" = "gray50", "Autre" = "#4a5a76"), guide = "none") +
+      scale_fill_manual(values = c("Sélectionnée" = "#4a5a76", "Autre" = "gray50"), guide = "none") +
       labs(title = "Saguenay–Lac-Saint-Jean", x = NULL, y = "Superficie (millions ha)") +
-      theme_minimal()
+      theme_minimal() +
+      theme(
+        axis.text.y = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(face = "bold", size = 10), 
+        axis.title.x = element_text(face = "bold", size = 12, margin = margin(t = 15)),
+        axis.title.y = element_text(face = "bold", size = 12, margin = margin(r = 10)),
+        plot.title = element_text(size = 14, face = "bold")
+      )
+
+      
   })
-  
+
   # Graphique Québec
   output$plot_quebec <- renderPlot({
     df_quebec <- df_tbe_tabulaire %>%
@@ -198,9 +207,16 @@ server <- function(input, output, session) {
                 aes(label = sprintf("%.1f", SUP_HA)),
                 vjust = -0.5, color = "black", size = 4) +
       ylim(0, 15) +
-      scale_fill_manual(values = c("Sélectionnée" = "gray50", "Autre" = "#085016"), guide = "none") +
+      scale_fill_manual(values = c("Sélectionnée" = "#085016", "Autre" ="gray50"), guide = "none") +
       labs(title = "Province du Québec", x = NULL, y = "Superficie (millions ha)") +
-      theme_minimal()
+      theme_minimal()+
+      theme(
+        axis.text.y = element_text(face = "bold", size = 10),
+        axis.text.x = element_text(face = "bold", size = 10), 
+        axis.title.x = element_text(face = "bold", size = 12, margin = margin(t = 15)),
+        axis.title.y = element_text(face = "bold", size = 12, margin = margin(r = 10)),
+        plot.title = element_text(size = 14, face = "bold")
+      )
   })
 }
 
